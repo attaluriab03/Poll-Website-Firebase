@@ -1,42 +1,55 @@
 import { useState, useEffect } from 'react'
 import './App.css'
 import { db } from "./firebase";
-import { addDoc, collection } from "firebase/firestore";
+import { addDoc, collection, getDocs, updateDoc, doc } from "firebase/firestore";
 
 function App() {
   const [answer, setAnswer] = useState("");
-  const [upvotes, setUpvotes] = useState(0);
+  const [currData, setCurrData] = useState([]);
 
+  // to get all previous responses
+  const fetchData = async () => {
+    let data = [];
+    const querySnapshot = await getDocs(collection(db, 'users'));
+    querySnapshot.forEach(doc => {
+      data.push({
+        id: doc.id, 
+        ...doc.data() // '...' is shorthand to add rest of data
+      }); // we use curly brackets to signify that we are pushing an object
+    });
+    setCurrData(data);
+  }
+  
+  useEffect(() => {
+    fetchData();
+  }, [])
+  
+  // to add data to database
   const handleSubmit = async (e) => {
     e.preventDefault();
-    // console.log("Form submitted");
     try {
       const docRef = await addDoc(collection(db, "users"), {
         response: answer,
-        upvotes: upvotes,
+        upvotes: 0,
       });
       console.log("created doc with id: ", docRef.id);
     } 
     catch (error) {
       console.error("Error fetching collection data: ", error)
     }
+    // add this to make the response show up immediately
+    fetchData();
   };
-
-  // fetch data and display it as it is being added
-  // try using child_added() and ref
-  useEffect(() => {
-    // const ref = 
-    
-    // const fetchResponses = () => {
-
-    // }
-  }, [])
 
   const handleChange = (e) => {
     setAnswer(e.target.value);
-    setUpvotes(upvotes + 1);
-    // console.log("Input value: ", e.target.value);
+  };
 
+  const upvoteResponse = async (id, currUpvotes) => {
+    await updateDoc(doc(db, 'users', id), {
+      upvotes: currUpvotes + 1,
+    });
+    fetchData();
   };
 
 
@@ -50,6 +63,15 @@ function App() {
         <br/>
         <button type="submit"> Submit </button>
       </form>
+      <div> 
+        <h2> Previous Responses: </h2>
+        {currData.map((response) => (
+          <div key={response.id}> 
+            <h4> {response.response} Upvotes: {response.upvotes} </h4>
+            <button onClick={() => upvoteResponse(response.id, response.upvotes)}> Upvote </button>
+          </div>
+        ))}
+      </div>
     </>
   );
 
